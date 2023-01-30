@@ -6,48 +6,62 @@ import androidx.javascriptengine.JavaScriptSandbox
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import it.airgap.vault.util.*
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.guava.asDeferred
-import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.*
 
 class ModuleJSContext(private val context: Context) {
-    private val jsAsyncResult: JSAsyncResult = JSAsyncResult()
+    private val jsSandbox: Deferred<JavaScriptSandbox> = JavaScriptSandbox.createConnectedInstanceAsync(context).asDeferred()
+    private val jsIsolates: MutableMap<String, JavaScriptIsolate> = mutableMapOf()
 
-    private val webViewLoadedDeferred: CompletableDeferred<Unit> = CompletableDeferred()
+    private val modules: MutableMap<String, JSModule> = mutableMapOf()
 
-    private val modules: MutableMap<String, String> = mutableMapOf()
+    suspend fun evaluateLoadModules(modules: List<JSModule>, protocolType: JSProtocolType?): JSObject {
+        val loadedModules = modules.asyncMap { evaluate(it, JSModuleAction.Load(protocolType)) }
 
-    suspend fun evaluateLoadModules(protocolType: JSProtocolType?): JSObject =
-        evaluate(JSProtocolAction.LoadModules(protocolType))
+        return JSObject("""
+            "modules": $loadedModules
+        """.trimIndent())
+    }
 
     suspend fun evaluateCallOfflineProtocolMethod(
         name: String,
         args: JSArray?,
         protocolIdentifier: String,
-    ): JSObject = evaluate(JSProtocolAction.CallOfflineProtocolMethod(name, args, protocolIdentifier))
+    ): JSObject {
+        val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
+        return evaluate(module, JSModuleAction.CallMethod.OfflineProtocol(name, args, protocolIdentifier))
+    }
 
     suspend fun evaluateCallOnlineProtocolMethod(
         name: String,
         args: JSArray?,
         protocolIdentifier: String,
         networkId: String?,
-    ): JSObject = evaluate(JSProtocolAction.CallOnlineProtocolMethod(name, args, protocolIdentifier, networkId))
+    ): JSObject {
+        val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
+        return evaluate(module, JSModuleAction.CallMethod.OnlineProtocol(name, args, protocolIdentifier, networkId))
+    }
 
     suspend fun evaluateCallBlockExplorerMethod(
         name: String,
         args: JSArray?,
         protocolIdentifier: String,
         networkId: String?,
-    ): JSObject = evaluate(JSProtocolAction.CallBlockExplorerMethod(name, args, protocolIdentifier, networkId))
+    ): JSObject {
+        val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
+        return evaluate(module, JSModuleAction.CallMethod.BlockExplorer(name, args, protocolIdentifier, networkId))
+    }
 
     suspend fun evaluateCallV3SerializerCompanionMethod(
         name: String,
         args: JSArray?,
         moduleIdentifier: String,
-    ): JSObject = evaluate(JSProtocolAction.CallV3SerializerCompanionMethod(name, args, moduleIdentifier))
+    ): JSObject {
+        val module = modules[moduleIdentifier] ?: failWithModuleNotFound(moduleIdentifier)
+        return evaluate(module, JSModuleAction.CallMethod.V3SerializerCompanion(name, args, moduleIdentifier))
+    }
 
 
     suspend fun destroy() {
@@ -55,19 +69,13 @@ class ModuleJSContext(private val context: Context) {
         jsSandbox.await().close()
     }
 
-    private val jsSandbox: Deferred<JavaScriptSandbox> = JavaScriptSandbox.createConnectedInstanceAsync(context).asDeferred()
-    private val jsIsolates: MutableMap<String, JavaScriptIsolate> = mutableMapOf()
-
     @Throws(JSException::class)
-    private suspend fun evaluate(action: JSProtocolAction): JSObject = withContext(Dispatchers.Default) {
-
-
-        useIsolatedModule(identifier) { jsIsolate, module ->
+    private suspend fun evaluate(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Default) {
+        useIsolatedModule(module) { jsIsolate, module ->
             val script = """
                 execute(
-                    global.${module},
-                    '${identifier}',
-                    ${options.orUndefined()},
+                    global.${module}.create(),
+                    '${module}',
                     $action,
                     function (result) {
                         return JSON.stringify({ ${action.resultField}: result });
@@ -86,91 +94,43 @@ class ModuleJSContext(private val context: Context) {
         }
     }
 
-    private suspend inline fun <R> useIsolatedModule(identifier: String, block: (JavaScriptIsolate, String) -> R): R {
-        val moduleName = moduleName(identifier) ?: failWithModuleNotFound(identifier)
-        val jsIsolate = jsIsolates.getOrPut(moduleName) {
+    private suspend inline fun <R> useIsolatedModule(module: JSModule, block: (JavaScriptIsolate, String) -> R): R {
+        val jsIsolate = jsIsolates.getOrPut(module.identifier) {
             jsSandbox.await().createIsolate().also {
-                it.evaluateJavaScriptAsync("var global = {};")
-                val isolatedProtocolScript = context.assets.open("public/assets/native/isolated_modules/isolated-protocol.script.js").use { stream -> stream.readBytes().decodeToString() }
-                it.evaluateJavaScriptAsync(isolatedProtocolScript).asDeferred().await()
-                it.loadModule(moduleName)
+                val utils = context.assets.open("public/assets/native/isolated_modules/isolated-modules.android.js").use { stream -> stream.readBytes().decodeToString() }
+                val script = context.assets.open("public/assets/native/isolated_modules/isolated-modules.script.js").use { stream -> stream.readBytes().decodeToString() }
+                listOf(it.evaluateJavaScriptAsync(utils).asDeferred(), it.evaluateJavaScriptAsync(script).asDeferred()).awaitAll()
+                it.loadModule(module)
             }
         }
 
-        return block(jsIsolate, createJSModule(moduleName))
+        return block(jsIsolate, module.identifier)
     }
 
-    private suspend fun JavaScriptIsolate.loadModule(name: String) {
-        val source = readModuleSource(name)
-        provideNamedData("${name}-script", source.encodeToByteArray())
-        evaluateJavaScriptAsync("""
-            function utf8ArrayToStr(array) {
-              var out, i, len, c;
-              var char2, char3;
-
-              out = "";
-              len = array.length;
-              i = 0;
-              while (i < len) {
-                c = array[i++];
-                switch (c >> 4)
-                { 
-                  case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
-                    // 0xxxxxxx
-                    out += String.fromCharCode(c);
-                    break;
-                  case 12: case 13:
-                    // 110x xxxx   10xx xxxx
-                    char2 = array[i++];
-                    out += String.fromCharCode(((c & 0x1F) << 6) | (char2 & 0x3F));
-                    break;
-                  case 14:
-                    // 1110 xxxx  10xx xxxx  10xx xxxx
-                    char2 = array[i++];
-                    char3 = array[i++];
-                    out += String.fromCharCode(((c & 0x0F) << 12) |
-                                               ((char2 & 0x3F) << 6) |
-                                               ((char3 & 0x3F) << 0));
-                    break;
-                }
-              }    
-              return out;
-            }
-        """.trimIndent())
-        evaluateJavaScriptAsync("""
-            android.consumeNamedDataAsArrayBuffer('${name}-script').then((value) => {
-                var string = utf8ArrayToStr(new Uint8Array(value));
-                eval(string);
-            });
-        """.trimIndent()).asDeferred().await()
-    }
-
-    private fun JSObject?.orUndefined(): Any = this ?: JSUndefined
-
-    private fun JSArray.replaceNullWithUndefined(): JSArray =
-        JSArray(toList<Any>().map { if (it == JSObject.NULL) JSUndefined else it })
-
-    private fun readModuleSource(name: String): String =
-        context.assets.open("public/assets/libs/airgap-${name}.browserify.js").use { it.readBytes().decodeToString() }
-
-    private fun createJSModule(name: String): String =
-        "airgapCoinLib${name.replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-        }}"
-
-    private fun moduleName(identifier: String): String? =
-        when {
-            identifier.startsWithAny("ae") -> "aeternity"
-            identifier.startsWithAny("astar", "shiden") -> "astar"
-            identifier.startsWithAny("btc") -> "bitcoin"
-            identifier.startsWithAny("cosmos") -> "cosmos"
-            identifier.startsWithAny("eth") -> "ethereum"
-            identifier.startsWithAny("grs") -> "groestlcoin"
-            identifier.startsWithAny("moonbeam", "moonriver", "moonbase") -> "moonbeam"
-            identifier.startsWithAny("polkadot", "kusama") -> "polkadot"
-            identifier.startsWithAny("xtz") -> "tezos"
-            else -> null
+    private suspend fun JavaScriptIsolate.loadModule(module: JSModule) {
+        val sources = module.readModuleSources()
+        sources.forEachIndexed { idx, source ->
+            provideNamedData("${module.identifier}-$idx-script", source)
+            evaluateJavaScriptAsync("""
+                android.consumeNamedDataAsArrayBuffer('${module.identifier}-script').then((value) => {
+                    var string = utf8ArrayToString(new Uint8Array(value));
+                    eval(string);
+                });
+            """.trimIndent()).asDeferred().await()
         }
+    }
+
+    private fun JSModule.readModuleSources(): List<ByteArray> =
+        when (this) {
+            is JSModule.Asset -> readModuleSources()
+            is JSModule.External -> readModuleSources()
+        }
+
+    private fun JSModule.Asset.readModuleSources(): List<ByteArray> =
+        paths.map { path -> context.assets.open(path).use { it.readBytes() } }
+
+    private fun JSModule.External.readModuleSources(): List<ByteArray> =
+        paths.map { path -> File(path).readBytes() }
 
     enum class JSProtocolType {
         Offline, Online, Full;
@@ -192,11 +152,19 @@ class ModuleJSContext(private val context: Context) {
         }
     }
 
-    private sealed interface JSProtocolAction {
+    sealed interface JSModule {
+        val identifier: String
+        val paths: List<String>
+
+        data class Asset(override val identifier: String, override val paths: List<String>) : JSModule
+        data class External(override val identifier: String, override val paths: List<String>) : JSModule
+    }
+
+    private sealed interface JSModuleAction {
         val resultField: String
             get() = "result"
 
-        data class LoadModules(val protocolType: JSProtocolType?) : JSProtocolAction {
+        data class Load(val protocolType: JSProtocolType?) : JSModuleAction {
             override val resultField: String = "loadModules"
 
             override fun toString(): String = JSObject("""
@@ -207,16 +175,16 @@ class ModuleJSContext(private val context: Context) {
             """.trimIndent()).toString()
 
             companion object {
-                private const val TYPE = "loadModules"
+                private const val TYPE = "load"
             }
         }
 
-        sealed class CallMethod(val target: JSCallMethodTarget, private val partial: JSObject) : JSProtocolAction {
+        sealed class CallMethod(val target: JSCallMethodTarget, private val partial: JSObject) : JSModuleAction {
             abstract val name: String
             abstract val args: JSArray?
 
             override fun toString(): String {
-                val args = args?.toString() ?: "[]"
+                val args = args?.replaceNullWithUndefined()?.toString() ?: "[]"
 
                 return JSObject("""
                     {
@@ -230,56 +198,64 @@ class ModuleJSContext(private val context: Context) {
                     .toString()
             }
 
-            companion object {
-                private const val TYPE = "callMethod"
-            }
-        }
-
-        data class CallOfflineProtocolMethod(
-            override val name: String,
-            override val args: JSArray?,
-            val protocolIdentifier: String,
-        ) : CallMethod(JSCallMethodTarget.Offline, JSObject("""
+            data class OfflineProtocol(
+                override val name: String,
+                override val args: JSArray?,
+                val protocolIdentifier: String,
+            ) : CallMethod(JSCallMethodTarget.Offline, JSObject("""
             {
                 protocolIdentifier: "$protocolIdentifier"
             }
         """.trimIndent()))
 
-        data class CallOnlineProtocolMethod(
-            override val name: String,
-            override val args: JSArray?,
-            val protocolIdentifier: String,
-            val networkId: String?,
-        ) : CallMethod(JSCallMethodTarget.Online, JSObject("""
+            data class OnlineProtocol(
+                override val name: String,
+                override val args: JSArray?,
+                val protocolIdentifier: String,
+                val networkId: String?,
+            ) : CallMethod(JSCallMethodTarget.Online, JSObject("""
             {
                 protocolIdentifier: "$protocolIdentifier",
                 networkId: ${networkId.toJson()}
             }
         """.trimIndent()))
 
-        data class CallBlockExplorerMethod(
-            override val name: String,
-            override val args: JSArray?,
-            val protocolIdentifier: String,
-            val networkId: String?,
-        ) : CallMethod(JSCallMethodTarget.BlockExplorer, JSObject("""
+            data class BlockExplorer(
+                override val name: String,
+                override val args: JSArray?,
+                val protocolIdentifier: String,
+                val networkId: String?,
+            ) : CallMethod(JSCallMethodTarget.BlockExplorer, JSObject("""
             {
                 protocolIdentifier: "$protocolIdentifier",
                 networkId: ${networkId.toJson()}
             }
         """.trimIndent()))
 
-        data class CallV3SerializerCompanionMethod(
-            override val name: String,
-            override val args: JSArray?,
-            val moduleIdentifier: String,
-        ) : CallMethod(JSCallMethodTarget.V3SerializerCompanion, JSObject("""
+            data class V3SerializerCompanion(
+                override val name: String,
+                override val args: JSArray?,
+                val moduleIdentifier: String,
+            ) : CallMethod(JSCallMethodTarget.V3SerializerCompanion, JSObject("""
             {
                 moduleIdentifier: "$moduleIdentifier"
             }
         """.trimIndent()))
+
+            companion object {
+                private const val TYPE = "callMethod"
+            }
+        }
     }
 
     @Throws(IllegalStateException::class)
-    private fun failWithModuleNotFound(identifier: String): Nothing = throw IllegalStateException("Module $identifier could not be found.")
+    private fun failWithModuleForProtocolNotFound(protocolIdentifier: String): Nothing = throw IllegalStateException("Module for protocol $protocolIdentifier could not be found.")
+
+    @Throws(IllegalStateException::class)
+    private fun failWithModuleNotFound(moduleIdentifier: String): Nothing = throw IllegalStateException("Module $moduleIdentifier could not be found.")
 }
+
+private fun JSObject?.orUndefined(): Any = this ?: JSUndefined
+
+private fun JSArray.replaceNullWithUndefined(): JSArray =
+    JSArray(toList<Any>().map { if (it == JSObject.NULL) JSUndefined else it })

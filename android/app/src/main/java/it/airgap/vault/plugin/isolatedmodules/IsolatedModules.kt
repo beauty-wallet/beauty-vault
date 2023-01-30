@@ -29,7 +29,48 @@ class IsolatedModules : Plugin() {
             activity.lifecycleScope.launch {
                 executeCatching {
                     val jsContext = moduleJSContextManager.get() ?: failWithJSContextNotInitialized()
-                    resolve(jsContext.evaluateLoadModules(protocolType))
+
+                    // TODO: load dynamically
+                    val modules = listOf(
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "aeternity",
+                            paths = listOf("/public/assets/libs/aeternity/airgap-aeternity.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "astar",
+                            paths = listOf("/public/assets/libs/astar/airgap-astar.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "bitcoin",
+                            paths = listOf("/public/assets/libs/bitcoin/airgap-bitcoin.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "cosmos",
+                            paths = listOf("/public/assets/libs/cosmos/airgap-cosmos.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "ethereum",
+                            paths = listOf("/public/assets/libs/ethereum/airgap-ethereum.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "groestlcoin",
+                            paths = listOf("/public/assets/libs/groestlcoin/airgap-groestlcoin.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "moonbeam",
+                            paths = listOf("/public/assets/libs/moonbeam/airgap-moonbeam.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "polkadot",
+                            paths = listOf("/public/assets/libs/polkadot/airgap-polkadot.browserify.js"),
+                        ),
+                        ModuleJSContext.JSModule.Asset(
+                            identifier = "tezos",
+                            paths = listOf("/public/assets/libs/tezos/airgap-tezos.browserify.js"),
+                        ),
+                    )
+
+                    resolve(jsContext.evaluateLoadModules(modules, protocolType))
                 }
             }
         }
