@@ -21,7 +21,9 @@ class ModuleJSContext(private val context: Context) {
         val loadedModules = modules.asyncMap { evaluate(it, JSModuleAction.Load(protocolType)) }
 
         return JSObject("""
-            "modules": $loadedModules
+            {
+                "modules": $loadedModules
+            }
         """.trimIndent())
     }
 
@@ -60,7 +62,7 @@ class ModuleJSContext(private val context: Context) {
         moduleIdentifier: String,
     ): JSObject {
         val module = modules[moduleIdentifier] ?: failWithModuleNotFound(moduleIdentifier)
-        return evaluate(module, JSModuleAction.CallMethod.V3SerializerCompanion(name, args, moduleIdentifier))
+        return evaluate(module, JSModuleAction.CallMethod.V3SerializerCompanion(name, args))
     }
 
 
@@ -72,18 +74,25 @@ class ModuleJSContext(private val context: Context) {
     @Throws(JSException::class)
     private suspend fun evaluate(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Default) {
         useIsolatedModule(module) { jsIsolate, module ->
+
             val script = """
-                execute(
-                    global.${module}.create(),
-                    '${module}',
-                    $action,
-                    function (result) {
-                        return JSON.stringify({ ${action.resultField}: result });
-                    },
-                    function (error) {
-                        return JSON.stringify({ error });
-                    }
-                );
+                global.${module}.create = () => {
+                    return new global.${module}.${module.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}Module
+                }
+                
+                new Promise((resolve, reject) => {
+                    execute(
+                        global.${module},
+                        '${module}',
+                        $action,
+                        function (result) {
+                            resolve(JSON.stringify(result));
+                        },
+                        function (error) {
+                            reject(JSON.stringify({ error }));
+                        }
+                    );
+                })
             """.trimIndent()
 
             val result = jsIsolate.evaluateJavaScriptAsync(script).asDeferred().await()
@@ -110,9 +119,10 @@ class ModuleJSContext(private val context: Context) {
     private suspend fun JavaScriptIsolate.loadModule(module: JSModule) {
         val sources = module.readModuleSources()
         sources.forEachIndexed { idx, source ->
-            provideNamedData("${module.identifier}-$idx-script", source)
+            val scriptId = "${module.identifier}-$idx-script"
+            provideNamedData(scriptId, source)
             evaluateJavaScriptAsync("""
-                android.consumeNamedDataAsArrayBuffer('${module.identifier}-script').then((value) => {
+                android.consumeNamedDataAsArrayBuffer('${scriptId}').then((value) => {
                     var string = utf8ArrayToString(new Uint8Array(value));
                     eval(string);
                 });
@@ -161,12 +171,7 @@ class ModuleJSContext(private val context: Context) {
     }
 
     private sealed interface JSModuleAction {
-        val resultField: String
-            get() = "result"
-
         data class Load(val protocolType: JSProtocolType?) : JSModuleAction {
-            override val resultField: String = "loadModules"
-
             override fun toString(): String = JSObject("""
                 {
                     "type": "$TYPE",
@@ -234,13 +239,8 @@ class ModuleJSContext(private val context: Context) {
 
             data class V3SerializerCompanion(
                 override val name: String,
-                override val args: JSArray?,
-                val moduleIdentifier: String,
-            ) : CallMethod(JSCallMethodTarget.V3SerializerCompanion, JSObject("""
-            {
-                moduleIdentifier: "$moduleIdentifier"
-            }
-        """.trimIndent()))
+                override val args: JSArray?
+            ) : CallMethod(JSCallMethodTarget.V3SerializerCompanion, JSObject("{}"))
 
             companion object {
                 private const val TYPE = "callMethod"

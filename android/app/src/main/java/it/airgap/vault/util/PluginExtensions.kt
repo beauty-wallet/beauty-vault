@@ -61,6 +61,7 @@ inline fun PluginCall.executeCatching(block: PluginCall.() -> Unit) {
     try {
         block()
     } catch (e: Throwable) {
+        e.printStackTrace()
         reject(e.message)
     }
 }
