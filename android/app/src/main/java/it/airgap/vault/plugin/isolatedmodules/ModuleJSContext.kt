@@ -1,6 +1,7 @@
 package it.airgap.vault.plugin.isolatedmodules
 
 import android.content.Context
+import androidx.javascriptengine.IsolateStartupParameters
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.JavaScriptSandbox
 import com.getcapacitor.JSArray
@@ -18,7 +19,9 @@ class ModuleJSContext(private val context: Context) {
     private val modules: MutableMap<String, JSModule> = mutableMapOf()
 
     suspend fun evaluateLoadModules(modules: List<JSModule>, protocolType: JSProtocolType?): JSObject {
-        val loadedModules = modules.asyncMap { evaluate(it, JSModuleAction.Load(protocolType)) }
+        val loadedModules = modules.asyncMap {  module ->
+            evaluate(module, JSModuleAction.Load(protocolType)).also { module.registerFor(it) }
+        }
 
         return JSObject("""
             {
@@ -74,7 +77,6 @@ class ModuleJSContext(private val context: Context) {
     @Throws(JSException::class)
     private suspend fun evaluate(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Default) {
         useIsolatedModule(module) { jsIsolate, module ->
-
             val script = """
                 global.${module}.create = () => {
                     return new global.${module}.${module.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}Module
@@ -84,7 +86,7 @@ class ModuleJSContext(private val context: Context) {
                     execute(
                         global.${module},
                         '${module}',
-                        $action,
+                        ${action.toJson()},
                         function (result) {
                             resolve(JSON.stringify(result));
                         },
@@ -105,7 +107,7 @@ class ModuleJSContext(private val context: Context) {
 
     private suspend inline fun <R> useIsolatedModule(module: JSModule, block: (JavaScriptIsolate, String) -> R): R {
         val jsIsolate = jsIsolates.getOrPut(module.identifier) {
-            jsSandbox.await().createIsolate().also {
+            jsSandbox.await().createIsolate(IsolateStartupParameters()).also {
                 val utils = context.assets.open("public/assets/native/isolated_modules/isolated-modules.android.js").use { stream -> stream.readBytes().decodeToString() }
                 val script = context.assets.open("public/assets/native/isolated_modules/isolated-modules.script.js").use { stream -> stream.readBytes().decodeToString() }
                 listOf(it.evaluateJavaScriptAsync(utils).asDeferred(), it.evaluateJavaScriptAsync(script).asDeferred()).awaitAll()
@@ -142,10 +144,20 @@ class ModuleJSContext(private val context: Context) {
     private fun JSModule.External.readModuleSources(): List<ByteArray> =
         paths.map { path -> File(path).readBytes() }
 
+    private fun JSModule.registerFor(json: JSObject) {
+        val protocols = json.getJSONArray("protocols")
+        for (i in 0 until protocols.length()) {
+            val protocol = protocols.getJSONObject(i)
+            val identifier = protocol.getString("identifier")
+
+            modules[identifier] = this
+        }
+    }
+
     enum class JSProtocolType {
         Offline, Online, Full;
 
-        override fun toString(): String = name.lowercase()
+        override fun toString(): String = name.replaceFirstChar { it.lowercase(Locale.getDefault()) }
 
         companion object {
             fun fromString(value: String): JSProtocolType? = values().find { it.name.lowercase() == value.lowercase() }
@@ -153,9 +165,9 @@ class ModuleJSContext(private val context: Context) {
     }
 
     enum class JSCallMethodTarget {
-        Offline, Online, BlockExplorer, V3SerializerCompanion;
+        OfflineProtocol, OnlineProtocol, BlockExplorer, V3SerializerCompanion;
 
-        override fun toString(): String = name.lowercase()
+        override fun toString(): String = name.replaceFirstChar { it.lowercase(Locale.getDefault()) }
 
         companion object {
             fun fromString(value: String): JSCallMethodTarget? = values().find { it.name.lowercase() == value.lowercase() }
@@ -171,8 +183,10 @@ class ModuleJSContext(private val context: Context) {
     }
 
     private sealed interface JSModuleAction {
+        fun toJson(): String
+
         data class Load(val protocolType: JSProtocolType?) : JSModuleAction {
-            override fun toString(): String = JSObject("""
+            override fun toJson(): String = JSObject("""
                 {
                     "type": "$TYPE",
                     "protocolType": ${protocolType?.toString().toJson()}
@@ -188,7 +202,7 @@ class ModuleJSContext(private val context: Context) {
             abstract val name: String
             abstract val args: JSArray?
 
-            override fun toString(): String {
+            override fun toJson(): String {
                 val args = args?.replaceNullWithUndefined()?.toString() ?: "[]"
 
                 return JSObject("""
@@ -207,7 +221,7 @@ class ModuleJSContext(private val context: Context) {
                 override val name: String,
                 override val args: JSArray?,
                 val protocolIdentifier: String,
-            ) : CallMethod(JSCallMethodTarget.Offline, JSObject("""
+            ) : CallMethod(JSCallMethodTarget.OfflineProtocol, JSObject("""
             {
                 protocolIdentifier: "$protocolIdentifier"
             }
@@ -218,7 +232,7 @@ class ModuleJSContext(private val context: Context) {
                 override val args: JSArray?,
                 val protocolIdentifier: String,
                 val networkId: String?,
-            ) : CallMethod(JSCallMethodTarget.Online, JSObject("""
+            ) : CallMethod(JSCallMethodTarget.OnlineProtocol, JSObject("""
             {
                 protocolIdentifier: "$protocolIdentifier",
                 networkId: ${networkId.toJson()}

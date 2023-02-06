@@ -85,11 +85,11 @@ class IsolatedModules : Plugin() {
                 executeCatching {
                     val jsContext = moduleJSContextManager.get() ?: failWithJSContextNotInitialized()
                     val value = when (target) {
-                        ModuleJSContext.JSCallMethodTarget.Offline -> {
+                        ModuleJSContext.JSCallMethodTarget.OfflineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
                             jsContext.evaluateCallOfflineProtocolMethod(method, args, protocolIdentifier)
                         }
-                        ModuleJSContext.JSCallMethodTarget.Online -> {
+                        ModuleJSContext.JSCallMethodTarget.OnlineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
                             jsContext.evaluateCallOnlineProtocolMethod(method, args, protocolIdentifier, networkId)
                         }

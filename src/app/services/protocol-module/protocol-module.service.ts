@@ -114,8 +114,8 @@ export class ProtocolModuleService {
       for (const protocol of Object.values(targetProtocols)) {
         const adapter: ICoinProtocolAdapter = await this.createProtocolAdapter(protocol, v3SerializerCompanion)
 
-        if (adapter instanceof ICoinSubProtocolAdapter) {
-          const mainIdentifier: string = await adapter.protocolV1.mainProtocol()
+        if (adapter instanceof ICoinSubProtocolAdapter && protocol.type === 'sub') {
+          const mainIdentifier: string = protocol.mainProtocolIdentifier
           if (mainIdentifier !in activeProtocols) {
             const mainAdapter: ICoinProtocolAdapter = await this.createProtocolAdapter(targetProtocols[mainIdentifier], v3SerializerCompanion)
             activeProtocols[mainIdentifier] = mainAdapter
