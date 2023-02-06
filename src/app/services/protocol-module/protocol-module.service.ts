@@ -30,7 +30,7 @@ export interface ProtocolModuleManifest {
   signature: string
   src?: {
     main?: string
-    module_name?: string
+    namespace?: string
   }
   res?: {
     symbol?: string

@@ -1,9 +1,14 @@
 package it.airgap.vault.plugin.isolatedmodules
 
-import android.content.Context
 import androidx.lifecycle.lifecycleScope
 import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
+import it.airgap.vault.plugin.isolatedmodules.js.JSCallMethodTarget
+import it.airgap.vault.plugin.isolatedmodules.js.JSModule
+import it.airgap.vault.plugin.isolatedmodules.js.JSProtocolType
+import it.airgap.vault.plugin.isolatedmodules.js.JSEnvironment
+import it.airgap.vault.plugin.isolatedmodules.js.context.JSEnvironmentContext
+import it.airgap.vault.plugin.isolatedmodules.js.context.WebViewEnvironmentContext
 import it.airgap.vault.util.assertReceived
 import it.airgap.vault.util.executeCatching
 import kotlinx.coroutines.Dispatchers
@@ -14,11 +19,11 @@ import kotlinx.coroutines.sync.withLock
 @CapacitorPlugin
 class IsolatedModules : Plugin() {
 
-    private val moduleJSContextManager: ModuleJSContextManager = ModuleJSContextManager()
+    private val moduleJSEnvironmentManager: ModuleJSEnvironmentManager = ModuleJSEnvironmentManager()
 
     override fun load() {
         activity.lifecycleScope.launch(Dispatchers.Main) {
-            moduleJSContextManager.createJSContext(context)
+            moduleJSEnvironmentManager.createJSEnvironment(WebViewEnvironmentContext(context))
         }
         super.load()
     }
@@ -28,43 +33,43 @@ class IsolatedModules : Plugin() {
         call.executeCatching {
             activity.lifecycleScope.launch {
                 executeCatching {
-                    val jsContext = moduleJSContextManager.get() ?: failWithJSContextNotInitialized()
+                    val jsContext = moduleJSEnvironmentManager.get() ?: failWithJSContextNotInitialized()
 
                     // TODO: load dynamically
                     val modules = listOf(
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "aeternity",
                             paths = listOf("public/assets/libs/aeternity/airgap-aeternity.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "astar",
                             paths = listOf("public/assets/libs/astar/airgap-astar.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "bitcoin",
                             paths = listOf("public/assets/libs/bitcoin/airgap-bitcoin.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "cosmos",
                             paths = listOf("public/assets/libs/cosmos/airgap-cosmos.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "ethereum",
                             paths = listOf("public/assets/libs/ethereum/airgap-ethereum.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "groestlcoin",
                             paths = listOf("public/assets/libs/groestlcoin/airgap-groestlcoin.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "moonbeam",
                             paths = listOf("public/assets/libs/moonbeam/airgap-moonbeam.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "polkadot",
                             paths = listOf("public/assets/libs/polkadot/airgap-polkadot.browserify.js"),
                         ),
-                        ModuleJSContext.JSModule.Asset(
+                        JSModule.Asset(
                             identifier = "tezos",
                             paths = listOf("public/assets/libs/tezos/airgap-tezos.browserify.js"),
                         ),
@@ -83,21 +88,21 @@ class IsolatedModules : Plugin() {
 
             activity.lifecycleScope.launch {
                 executeCatching {
-                    val jsContext = moduleJSContextManager.get() ?: failWithJSContextNotInitialized()
+                    val jsContext = moduleJSEnvironmentManager.get() ?: failWithJSContextNotInitialized()
                     val value = when (target) {
-                        ModuleJSContext.JSCallMethodTarget.OfflineProtocol -> {
+                        JSCallMethodTarget.OfflineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
                             jsContext.evaluateCallOfflineProtocolMethod(method, args, protocolIdentifier)
                         }
-                        ModuleJSContext.JSCallMethodTarget.OnlineProtocol -> {
+                        JSCallMethodTarget.OnlineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
                             jsContext.evaluateCallOnlineProtocolMethod(method, args, protocolIdentifier, networkId)
                         }
-                        ModuleJSContext.JSCallMethodTarget.BlockExplorer -> {
+                        JSCallMethodTarget.BlockExplorer -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
                             jsContext.evaluateCallBlockExplorerMethod(method, args, protocolIdentifier, networkId)
                         }
-                        ModuleJSContext.JSCallMethodTarget.V3SerializerCompanion -> {
+                        JSCallMethodTarget.V3SerializerCompanion -> {
                             assertReceived(Param.MODULE_IDENTIFIER)
                             jsContext.evaluateCallV3SerializerCompanionMethod(method, args, moduleIdentifier)
                         }
@@ -111,15 +116,15 @@ class IsolatedModules : Plugin() {
     override fun handleOnDestroy() {
         super.handleOnDestroy()
         activity.lifecycleScope.launch {
-            moduleJSContextManager.get()?.destroy()
+            moduleJSEnvironmentManager.get()?.destroy()
         }
     }
 
-    private val PluginCall.protocolType: ModuleJSContext.JSProtocolType?
-        get() = getString(Param.PROTOCOL_TYPE)?.let { ModuleJSContext.JSProtocolType.fromString(it) }
+    private val PluginCall.protocolType: JSProtocolType?
+        get() = getString(Param.PROTOCOL_TYPE)?.let { JSProtocolType.fromString(it) }
 
-    private val PluginCall.target: ModuleJSContext.JSCallMethodTarget
-        get() = getString(Param.TARGET)?.let { ModuleJSContext.JSCallMethodTarget.fromString(it) }!!
+    private val PluginCall.target: JSCallMethodTarget
+        get() = getString(Param.TARGET)?.let { JSCallMethodTarget.fromString(it) }!!
 
     private val PluginCall.method: String
         get() = getString(Param.METHOD)!!
@@ -136,16 +141,16 @@ class IsolatedModules : Plugin() {
     private val PluginCall.networkId: String?
         get() = getString(Param.NETWORK_ID)
 
-    private class ModuleJSContextManager {
+    private class ModuleJSEnvironmentManager {
         private val mutex: Mutex = Mutex()
-        private var webView: ModuleJSContext? = null
+        private var jsEnvironment: JSEnvironment? = null
 
-        suspend fun createJSContext(context: Context) = mutex.withLock {
-            webView = ModuleJSContext(context)
+        suspend fun createJSEnvironment(provider: JSEnvironmentContext) = mutex.withLock {
+            jsEnvironment = JSEnvironment(provider)
         }
 
-        suspend fun get(): ModuleJSContext? = mutex.withLock {
-            webView
+        suspend fun get(): JSEnvironment? = mutex.withLock {
+            jsEnvironment
         }
     }
 
