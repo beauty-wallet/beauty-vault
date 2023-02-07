@@ -1,5 +1,3 @@
-import { ICoinProtocol } from '@airgap/coinlib-core'
-import { ProtocolOptions } from '@airgap/coinlib-core/utils/ProtocolOptions'
 import { PluginListenerHandle, registerPlugin } from '@capacitor/core'
 import { Directory } from '@capacitor/filesystem'
 
@@ -61,23 +59,6 @@ export interface SecurityUtilsPlugin {
 }
 
 export const SecurityUtils: SecurityUtilsPlugin = registerPlugin('SecurityUtils')
-
-export interface IsolatedProtocolPlugin {
-  getField(params: { 
-    identifier: string,
-    options?: ProtocolOptions,
-    key: keyof ICoinProtocol
-  }): Promise<{ result: unknown }>
-  
-  callMethod(params: {
-    identifier: string,
-    options?: ProtocolOptions,
-    key: keyof ICoinProtocol,
-    args?: unknown[] 
-  }): Promise<{ result: unknown }>
-}
-
-export const IsolatedProtocol: IsolatedProtocolPlugin = registerPlugin('IsolatedProtocol')
 
 export interface ZipPlugin {
   unzip(params: {

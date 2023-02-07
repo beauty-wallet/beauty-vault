@@ -1,4 +1,4 @@
-import { APP_PLUGIN, CLIPBOARD_PLUGIN, FILESYSTEM_PLUGIN, ProtocolService, SPLASH_SCREEN_PLUGIN, STATUS_BAR_PLUGIN } from '@airgap/angular-core'
+import { APP_PLUGIN, CLIPBOARD_PLUGIN, FILESYSTEM_PLUGIN, IsolatedModulesPlugin, ISOLATED_MODULES_PLUGIN, ProtocolService, SPLASH_SCREEN_PLUGIN, STATUS_BAR_PLUGIN } from '@airgap/angular-core'
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
 import { AppPlugin } from '@capacitor/app'
@@ -12,6 +12,7 @@ import {
   createAppSpy,
   createClipboardSpy,
   createFilesystemSpy,
+  createIsolatedModulesSpy,
   createSaplingSpy,
   createSecurityUtilsSpy,
   createSplashScreenSpy,
@@ -39,6 +40,7 @@ describe('AppComponent', () => {
   let clipboardSpy: ClipboardPlugin
   let filesystemSpy: FilesystemPlugin
   let zipSpy: ZipPlugin
+  let isolatedModulesSpy: IsolatedModulesPlugin
   let platformReadySpy: Promise<void>
   let platformSpy: Platform
   // let component: AppComponent
@@ -53,6 +55,7 @@ describe('AppComponent', () => {
     clipboardSpy = createClipboardSpy()
     filesystemSpy = createFilesystemSpy()
     zipSpy = createZipSpy()
+    isolatedModulesSpy = createIsolatedModulesSpy()
     platformReadySpy = Promise.resolve()
     platformSpy = jasmine.createSpyObj('Platform', { ready: platformReadySpy })
 
@@ -71,6 +74,7 @@ describe('AppComponent', () => {
           { provide: CLIPBOARD_PLUGIN, useValue: clipboardSpy },
           { provide: FILESYSTEM_PLUGIN, useValue: filesystemSpy },
           { provide: ZIP_PLUGIN, useValue: zipSpy },
+          { provide: ISOLATED_MODULES_PLUGIN, useValue: isolatedModulesSpy },
           { provide: Platform, useValue: platformSpy },
           StartupChecksService,
           IACService,
