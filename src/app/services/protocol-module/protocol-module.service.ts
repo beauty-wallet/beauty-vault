@@ -29,7 +29,6 @@ export interface ProtocolModuleManifest {
   author: string
   signature: string
   src?: {
-    main?: string
     namespace?: string
   }
   res?: {

@@ -37,3 +37,4 @@ Thumbs.db
 UserInterfaceState.xcuserstate
 
 src/assets/libs/**/*.browserify.js
+src/assets/libs/**/manifest.json
