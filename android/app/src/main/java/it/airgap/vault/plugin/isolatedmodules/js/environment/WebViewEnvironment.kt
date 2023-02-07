@@ -1,24 +1,22 @@
-package it.airgap.vault.plugin.isolatedmodules.js.context
+package it.airgap.vault.plugin.isolatedmodules.js.environment
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.view.View
 import android.webkit.WebSettings
-import android.webkit.WebSettings.RenderPriority
 import android.webkit.WebView
 import com.getcapacitor.JSObject
+import it.airgap.vault.plugin.isolatedmodules.js.Assets
 import it.airgap.vault.plugin.isolatedmodules.js.JSModule
 import it.airgap.vault.plugin.isolatedmodules.js.JSModuleAction
-import it.airgap.vault.plugin.isolatedmodules.js.readModuleSources
-import it.airgap.vault.util.JSAsyncResult
-import it.airgap.vault.util.JSException
-import it.airgap.vault.util.addJavascriptInterface
-import it.airgap.vault.util.evaluateJavascript
+import it.airgap.vault.plugin.isolatedmodules.js.readSources
+import it.airgap.vault.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class WebViewEnvironmentContext(private val context: Context) : JSEnvironmentContext {
+class WebViewEnvironment(private val context: Context) : JSEnvironment {
     @Throws(JSException::class)
-    override suspend fun evaluate(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Main) {
+    override suspend fun run(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Main) {
         useIsolatedModule(module) { webView, jsAsyncResult, module ->
             // TODO: move create to coinlib
             val script = """
@@ -76,11 +74,9 @@ class WebViewEnvironmentContext(private val context: Context) : JSEnvironmentCon
         }
 
         with(webView) {
-            val script = context.assets.open("public/assets/native/isolated_modules/isolated-modules.script.js").use { stream -> stream.readBytes().decodeToString() }
+            evaluateJavascript(context.assets.readScript().decodeToString())
 
-            evaluateJavascript(script)
-
-            val sources = module.readModuleSources(context)
+            val sources = module.readSources(context)
             sources.forEach { evaluateJavascript(it.decodeToString()) }
         }
 
@@ -88,4 +84,6 @@ class WebViewEnvironmentContext(private val context: Context) : JSEnvironmentCon
             webView.destroy()
         }
     }
+
+    private fun AssetManager.readScript(): ByteArray = readBytes(Assets.SCRIPT)
 }

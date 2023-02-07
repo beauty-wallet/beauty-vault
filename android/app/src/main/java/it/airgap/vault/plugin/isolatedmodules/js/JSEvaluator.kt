@@ -1,24 +1,27 @@
 package it.airgap.vault.plugin.isolatedmodules.js
 
+import android.content.Context
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
-import it.airgap.vault.plugin.isolatedmodules.js.context.JSEnvironmentContext
+import it.airgap.vault.plugin.isolatedmodules.js.environment.JSEnvironment
+import it.airgap.vault.plugin.isolatedmodules.js.environment.WebViewEnvironment
 import it.airgap.vault.util.*
 import kotlinx.coroutines.*
 import java.util.*
-import java.util.concurrent.atomic.AtomicInteger
 
-class JSEnvironment(private val context: JSEnvironmentContext) {
+class JSEvaluator(context: Context) {
+    private val env: JSEnvironment = WebViewEnvironment(context)
+
     private val modules: MutableMap<String, JSModule> = mutableMapOf()
 
     suspend fun evaluateLoadModules(modules: List<JSModule>, protocolType: JSProtocolType?): JSObject {
-        val loadedModules = modules.asyncMap { module ->
-            context.evaluate(module, JSModuleAction.Load(protocolType)).also { module.registerFor(it) }
+        val modulesJson = modules.asyncMap { module ->
+            env.run(module, JSModuleAction.Load(protocolType)).also { module.registerFor(it) }
         }
 
         return JSObject("""
             {
-                "modules": $loadedModules
+                "modules": $modulesJson
             }
         """.trimIndent())
     }
@@ -29,7 +32,7 @@ class JSEnvironment(private val context: JSEnvironmentContext) {
         protocolIdentifier: String,
     ): JSObject {
         val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
-        return context.evaluate(module, JSModuleAction.CallMethod.OfflineProtocol(name, args, protocolIdentifier))
+        return env.run(module, JSModuleAction.CallMethod.OfflineProtocol(name, args, protocolIdentifier))
     }
 
     suspend fun evaluateCallOnlineProtocolMethod(
@@ -39,7 +42,7 @@ class JSEnvironment(private val context: JSEnvironmentContext) {
         networkId: String?,
     ): JSObject {
         val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
-        return context.evaluate(module, JSModuleAction.CallMethod.OnlineProtocol(name, args, protocolIdentifier, networkId))
+        return env.run(module, JSModuleAction.CallMethod.OnlineProtocol(name, args, protocolIdentifier, networkId))
     }
 
     suspend fun evaluateCallBlockExplorerMethod(
@@ -49,7 +52,7 @@ class JSEnvironment(private val context: JSEnvironmentContext) {
         networkId: String?,
     ): JSObject {
         val module = modules[protocolIdentifier] ?: failWithModuleForProtocolNotFound(protocolIdentifier)
-        return context.evaluate(module, JSModuleAction.CallMethod.BlockExplorer(name, args, protocolIdentifier, networkId))
+        return env.run(module, JSModuleAction.CallMethod.BlockExplorer(name, args, protocolIdentifier, networkId))
     }
 
     suspend fun evaluateCallV3SerializerCompanionMethod(
@@ -58,12 +61,12 @@ class JSEnvironment(private val context: JSEnvironmentContext) {
         moduleIdentifier: String,
     ): JSObject {
         val module = modules[moduleIdentifier] ?: failWithModuleNotFound(moduleIdentifier)
-        return context.evaluate(module, JSModuleAction.CallMethod.V3SerializerCompanion(name, args))
+        return env.run(module, JSModuleAction.CallMethod.V3SerializerCompanion(name, args))
     }
 
 
     suspend fun destroy() {
-        context.destroy()
+        env.destroy()
     }
 
     private fun JSModule.registerFor(json: JSObject) {

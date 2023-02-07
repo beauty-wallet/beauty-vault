@@ -13,23 +13,21 @@ sealed interface JSModule {
     val identifier: String
     val paths: List<String>
 
-    data class Asset(override val identifier: String, override val paths: List<String>) :
-        JSModule
-    data class External(override val identifier: String, override val paths: List<String>) :
-        JSModule
+    data class Asset(override val identifier: String, override val paths: List<String>) : JSModule
+    data class External(override val identifier: String, override val paths: List<String>) : JSModule
 }
 
-fun JSModule.readModuleSources(context: Context): List<ByteArray> =
+fun JSModule.readSources(context: Context): Sequence<ByteArray> =
     when (this) {
-        is JSModule.Asset -> readModuleSources(context)
-        is JSModule.External -> readModuleSources()
+        is JSModule.Asset -> readSources(context)
+        is JSModule.External -> readSources()
     }
 
-private fun JSModule.Asset.readModuleSources(context: Context): List<ByteArray> =
-    paths.map { path -> context.assets.open(path).use { it.readBytes() } }
+private fun JSModule.Asset.readSources(context: Context): Sequence<ByteArray> =
+    paths.asSequence().map { path -> context.assets.open(path).use { it.readBytes() } }
 
-private fun JSModule.External.readModuleSources(): List<ByteArray> =
-    paths.map { path -> File(path).readBytes() }
+private fun JSModule.External.readSources(): Sequence<ByteArray> =
+    paths.asSequence().map { path -> File(path).readBytes() }
 
 enum class JSProtocolType {
     Offline, Online, Full;

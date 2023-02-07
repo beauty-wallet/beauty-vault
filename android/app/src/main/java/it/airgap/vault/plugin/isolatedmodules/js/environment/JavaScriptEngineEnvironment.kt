@@ -1,26 +1,32 @@
-package it.airgap.vault.plugin.isolatedmodules.js.context
+package it.airgap.vault.plugin.isolatedmodules.js.environment
 
 import android.content.Context
+import android.content.res.AssetManager
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.javascriptengine.IsolateStartupParameters
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.JavaScriptSandbox
 import com.getcapacitor.JSObject
+import it.airgap.vault.plugin.isolatedmodules.js.Assets
 import it.airgap.vault.plugin.isolatedmodules.js.JSModule
 import it.airgap.vault.plugin.isolatedmodules.js.JSModuleAction
-import it.airgap.vault.plugin.isolatedmodules.js.readModuleSources
+import it.airgap.vault.plugin.isolatedmodules.js.readSources
 import it.airgap.vault.util.JSException
+import it.airgap.vault.util.readBytes
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.guava.asDeferred
 import kotlinx.coroutines.withContext
 
-class JavaScriptEngineEnvironmentContext(private val context: Context) : JSEnvironmentContext {
-    private val jsSandbox: Deferred<JavaScriptSandbox> = JavaScriptSandbox.createConnectedInstanceAsync(context).asDeferred()
-    private val jsIsolates: MutableMap<String, JavaScriptIsolate> = mutableMapOf()
+@RequiresApi(Build.VERSION_CODES.O)
+class JavaScriptEngineEnvironment(private val context: Context) : JSEnvironment {
+    private val sandbox: Deferred<JavaScriptSandbox> = JavaScriptSandbox.createConnectedInstanceAsync(context).asDeferred()
+    private val isolates: MutableMap<String, JavaScriptIsolate> = mutableMapOf()
 
     @Throws(JSException::class)
-    override suspend fun evaluate(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Default) {
+    override suspend fun run(module: JSModule, action: JSModuleAction): JSObject = withContext(Dispatchers.Default) {
         useIsolatedModule(module) { jsIsolate, module ->
             // TODO: move create to coinlib
             val script = """
@@ -52,16 +58,17 @@ class JavaScriptEngineEnvironmentContext(private val context: Context) : JSEnvir
     }
 
     override suspend fun destroy() {
-        jsIsolates.values.forEach { it.close() }
-        jsSandbox.await().close()
+        isolates.values.forEach { it.close() }
+        sandbox.await().close()
     }
 
     private suspend inline fun <R> useIsolatedModule(module: JSModule, block: (JavaScriptIsolate, String) -> R): R {
-        val jsIsolate = jsIsolates.getOrPut(module.identifier) {
-            jsSandbox.await().createIsolate(IsolateStartupParameters()).also {
-                val utils = context.assets.open("public/assets/native/isolated_modules/isolated-modules.js-engine-android.js").use { stream -> stream.readBytes().decodeToString() }
-                val script = context.assets.open("public/assets/native/isolated_modules/isolated-modules.script.js").use { stream -> stream.readBytes().decodeToString() }
-                listOf(it.evaluateJavaScriptAsync(utils).asDeferred(), it.evaluateJavaScriptAsync(script).asDeferred()).awaitAll()
+        val jsIsolate = isolates.getOrPut(module.identifier) {
+            sandbox.await().createIsolate(IsolateStartupParameters()).also {
+                listOf(
+                    it.evaluateJavaScriptAsync(context.assets.readUtils().decodeToString()).asDeferred(),
+                    it.evaluateJavaScriptAsync(context.assets.readScript().decodeToString()).asDeferred(),
+                ).awaitAll()
                 it.loadModule(module)
             }
         }
@@ -70,7 +77,7 @@ class JavaScriptEngineEnvironmentContext(private val context: Context) : JSEnvir
     }
 
     private suspend fun JavaScriptIsolate.loadModule(module: JSModule) {
-        val sources = module.readModuleSources(context)
+        val sources = module.readSources(context)
         sources.forEachIndexed { idx, source ->
             val scriptId = "${module.identifier}-$idx-script"
             provideNamedData(scriptId, source)
@@ -82,4 +89,7 @@ class JavaScriptEngineEnvironmentContext(private val context: Context) : JSEnvir
             """.trimIndent()).asDeferred().await()
         }
     }
+
+    private fun AssetManager.readUtils(): ByteArray = readBytes(Assets.JAVA_SCRIPT_ENGINE_UTILS)
+    private fun AssetManager.readScript(): ByteArray = readBytes(Assets.SCRIPT)
 }

@@ -8,7 +8,7 @@
 #import <Foundation/Foundation.h>
 #import <Capacitor/Capacitor.h>
 
-CAP_PLUGIN(IsolatedProtocol, "IsolatedProtocol",
-           CAP_PLUGIN_METHOD(getField, CAPPluginReturnPromise);
+CAP_PLUGIN(IsolatedModules, "IsolatedModules",
+           CAP_PLUGIN_METHOD(loadModules, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(callMethod, CAPPluginReturnPromise);
 )
