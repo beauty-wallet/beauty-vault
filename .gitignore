@@ -36,5 +36,4 @@ $RECYCLE.BIN/
 Thumbs.db
 UserInterfaceState.xcuserstate
 
-src/assets/libs/**/*.browserify.js
-src/assets/libs/**/manifest.json
+src/assets/protocol_modules/

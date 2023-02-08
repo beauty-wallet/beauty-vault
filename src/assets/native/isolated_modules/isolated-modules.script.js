@@ -161,8 +161,8 @@ function loadProtocols(module, protocolType) {
   ).then((protocols) => flattened(protocols))
 }
 
-function load(context, moduleIdentifier, action) {
-  const module = context.create()
+function load(namespace, moduleIdentifier, action) {
+  const module = namespace ? namespace.create() : create()
 
   return module.createV3SerializerCompanion()
     .then((v3SerializerCompanion) => 
@@ -172,8 +172,8 @@ function load(context, moduleIdentifier, action) {
 
 /***** CALL METHOD *****/
 
-function callOfflineProtocolMethod(context, protocolIdentifier, method, args) {
-  const module = context.create()
+function callOfflineProtocolMethod(namespace, protocolIdentifier, method, args) {
+  const module = namespace ? namespace.create() : create()
   return module.createOfflineProtocol(protocolIdentifier)
     .then((protocol) => {
       if (protocol === undefined) {
@@ -185,8 +185,8 @@ function callOfflineProtocolMethod(context, protocolIdentifier, method, args) {
     .then((value) => ({ value }))
 }
 
-function callOnlineProtocolMethod(context, protocolIdentifier, networkId, method, args) {
-  const module = context.create()
+function callOnlineProtocolMethod(namespace, protocolIdentifier, networkId, method, args) {
+  const module = namespace ? namespace.create() : create()
   return module.createOnlineProtocol(protocolIdentifier, networkId)
     .then((protocol) => {
       if (protocol === undefined) {
@@ -198,8 +198,8 @@ function callOnlineProtocolMethod(context, protocolIdentifier, networkId, method
     .then((value) => ({ value }))
 }
 
-function callBlockExplorerMethod(context, protocolIdentifier, networkId, method, args) {
-  const module = context.create()
+function callBlockExplorerMethod(namespace, protocolIdentifier, networkId, method, args) {
+  const module = namespace ? namespace.create() : create()
   return module.createBlockExplorer(protocolIdentifier, networkId)
     .then((blockExplorer) => {
       if (blockExplorer === undefined) {
@@ -211,8 +211,8 @@ function callBlockExplorerMethod(context, protocolIdentifier, networkId, method,
     .then((value) => ({ value }))
 }
 
-function callV3SerializerCompanionMethod(context, method, args) {
-  const module = context.create()
+function callV3SerializerCompanionMethod(namespace, method, args) {
+  const module = namespace ? namespace.create() : create()
   return module.createV3SerializerCompanion()
     .then((v3SerializerCompanion) => {
       if (v3SerializerCompanion === undefined) {
@@ -229,16 +229,16 @@ const CALL_METHOD_TARGET_ONLINE_PROTOCOL = 'onlineProtocol'
 const CALL_METHOD_TARGET_BLOCK_EXPLORER = 'blockExplorer'
 const CALL_METHOD_TARGET_V3_SERIALIZER_COMPANION = 'v3SerializerCompanion'
 
-function callMethod(context, action) {
+function callMethod(namespace, action) {
   switch (action.target) {
     case CALL_METHOD_TARGET_OFFLINE_PROTOCOL:
-      return callOfflineProtocolMethod(context, action.protocolIdentifier, action.method, action.args)
+      return callOfflineProtocolMethod(namespace, action.protocolIdentifier, action.method, action.args)
     case CALL_METHOD_TARGET_ONLINE_PROTOCOL:
-      return callOnlineProtocolMethod(context, action.protocolIdentifier, action.networkId, action.method, action.args)
+      return callOnlineProtocolMethod(namespace, action.protocolIdentifier, action.networkId, action.method, action.args)
     case CALL_METHOD_TARGET_BLOCK_EXPLORER:
-      return callBlockExplorerMethod(context, action.protocolIdentifier, action.networkId, action.method, action.args)
+      return callBlockExplorerMethod(namespace, action.protocolIdentifier, action.networkId, action.method, action.args)
     case CALL_METHOD_TARGET_V3_SERIALIZER_COMPANION:
-      return callV3SerializerCompanionMethod(context, action.method, action.args)
+      return callV3SerializerCompanionMethod(namespace, action.method, action.args)
   }
 }
 
@@ -247,7 +247,7 @@ function callMethod(context, action) {
 const ACTION_LOAD = 'load'
 const ACTION_CALL_METHOD = 'callMethod'
 
-function execute(context, moduleIdentifier, action, handleResult, handleError) {
+function execute(namespace, moduleIdentifier, action, handleResult, handleError) {
   const errorHandler = (description) => {
     const prefixedDescription = `[${moduleIdentifier}]${description ? ' ' + description : ''}`
     return createOnError(prefixedDescription, (error) => { 
@@ -259,10 +259,10 @@ function execute(context, moduleIdentifier, action, handleResult, handleError) {
   try {
     switch (action.type) {
       case ACTION_LOAD:
-        load(context, moduleIdentifier, action).then(handleResult).catch(errorHandler('load'))
+        load(namespace, moduleIdentifier, action).then(handleResult).catch(errorHandler('load'))
         break
       case ACTION_CALL_METHOD:
-        callMethod(context, action).then(handleResult).catch(errorHandler('call method'))
+        callMethod(namespace, action).then(handleResult).catch(errorHandler('call method'))
         break
       default:
         throw new Error(`Unknown action ${action.type}`)

@@ -35,6 +35,10 @@ export interface ProtocolModuleManifest {
     symbol?: string
   }
   include: string[]
+  jsenv?: {
+    android?: 'webview' | 'javascriptengine'
+    ios?: 'webview'
+  }
 }
 
 const MANIFEST_FILENAME = 'manifest.json'
@@ -257,7 +261,7 @@ export class ProtocolModuleService {
   }
 
   public async installModule(metadata: ProtocolModuleMetadata) {
-    const newPath: string = `protocol_modules/${metadata.manifest.name.replace(/\s+/, '_').toLocaleLowerCase()}`
+    const newPath: string = `protocol_modules/${metadata.manifest.name.replace(/\s+/, '_').replace('/', '').toLocaleLowerCase()}`
     const newDirectory: Directory = Directory.Data
 
     try {
@@ -332,6 +336,7 @@ export function isProtocolModuleManifest(json: unknown): json is ProtocolModuleM
   return implementsInterface<ProtocolModuleManifest>(json, {
     author: 'required',
     include: 'required',
+    jsenv: 'optional',
     name: 'required',
     res: 'optional',
     signature: 'required',

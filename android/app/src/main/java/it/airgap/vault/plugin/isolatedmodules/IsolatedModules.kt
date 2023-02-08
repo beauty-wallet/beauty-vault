@@ -2,67 +2,32 @@ package it.airgap.vault.plugin.isolatedmodules
 
 import androidx.lifecycle.lifecycleScope
 import com.getcapacitor.JSArray
+import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
-import it.airgap.vault.plugin.isolatedmodules.js.JSCallMethodTarget
-import it.airgap.vault.plugin.isolatedmodules.js.JSEvaluator
-import it.airgap.vault.plugin.isolatedmodules.js.JSModule
-import it.airgap.vault.plugin.isolatedmodules.js.JSProtocolType
+import it.airgap.vault.plugin.isolatedmodules.js.*
+import it.airgap.vault.plugin.isolatedmodules.js.environment.JSEnvironment
+import it.airgap.vault.util.ExecutableDeferred
 import it.airgap.vault.util.assertReceived
 import it.airgap.vault.util.executeCatching
+import it.airgap.vault.util.readBytes
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.launch
 
 @CapacitorPlugin
 class IsolatedModules : Plugin() {
-    private val jsEvaluator: JSEvaluator by lazy { JSEvaluator(context) }
+    private val jsEvaluator: Deferred<JSEvaluator> = ExecutableDeferred { JSEvaluator(context, fileExplorer) }
+    private val fileExplorer: FileExplorer by lazy { FileExplorer(context) }
 
     @PluginMethod
     fun loadModules(call: PluginCall) {
         activity.lifecycleScope.launch {
             call.executeCatching {
-                // TODO: load dynamically
-                val modules = listOf(
-                    JSModule.Asset(
-                        identifier = "aeternity",
-                        paths = listOf("public/assets/libs/aeternity/airgap-aeternity.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "astar",
-                        paths = listOf("public/assets/libs/astar/airgap-astar.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "bitcoin",
-                        paths = listOf("public/assets/libs/bitcoin/airgap-bitcoin.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "cosmos",
-                        paths = listOf("public/assets/libs/cosmos/airgap-cosmos.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "ethereum",
-                        paths = listOf("public/assets/libs/ethereum/airgap-ethereum.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "groestlcoin",
-                        paths = listOf("public/assets/libs/groestlcoin/airgap-groestlcoin.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "moonbeam",
-                        paths = listOf("public/assets/libs/moonbeam/airgap-moonbeam.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "polkadot",
-                        paths = listOf("public/assets/libs/polkadot/airgap-polkadot.browserify.js"),
-                    ),
-                    JSModule.Asset(
-                        identifier = "tezos",
-                        paths = listOf("public/assets/libs/tezos/airgap-tezos.browserify.js"),
-                    ),
-                )
+                val modules = fileExplorer.loadAssetModules() + fileExplorer.loadExternalModules()
 
-                resolve(jsEvaluator.evaluateLoadModules(modules, protocolType))
+                resolve(jsEvaluator.await().evaluateLoadModules(modules, protocolType))
             }
         }
     }
@@ -77,19 +42,19 @@ class IsolatedModules : Plugin() {
                     val value = when (target) {
                         JSCallMethodTarget.OfflineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
-                            jsEvaluator.evaluateCallOfflineProtocolMethod(method, args, protocolIdentifier)
+                            jsEvaluator.await().evaluateCallOfflineProtocolMethod(method, args, protocolIdentifier)
                         }
                         JSCallMethodTarget.OnlineProtocol -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
-                            jsEvaluator.evaluateCallOnlineProtocolMethod(method, args, protocolIdentifier, networkId)
+                            jsEvaluator.await().evaluateCallOnlineProtocolMethod(method, args, protocolIdentifier, networkId)
                         }
                         JSCallMethodTarget.BlockExplorer -> {
                             assertReceived(Param.PROTOCOL_IDENTIFIER)
-                            jsEvaluator.evaluateCallBlockExplorerMethod(method, args, protocolIdentifier, networkId)
+                            jsEvaluator.await().evaluateCallBlockExplorerMethod(method, args, protocolIdentifier, networkId)
                         }
                         JSCallMethodTarget.V3SerializerCompanion -> {
                             assertReceived(Param.MODULE_IDENTIFIER)
-                            jsEvaluator.evaluateCallV3SerializerCompanionMethod(method, args, moduleIdentifier)
+                            jsEvaluator.await().evaluateCallV3SerializerCompanionMethod(method, args, moduleIdentifier)
                         }
                     }
                     resolve(value)
@@ -101,7 +66,7 @@ class IsolatedModules : Plugin() {
     override fun handleOnDestroy() {
         super.handleOnDestroy()
         activity.lifecycleScope.launch {
-            jsEvaluator.destroy()
+            jsEvaluator.await().destroy()
         }
     }
 

@@ -1,33 +1,33 @@
 package it.airgap.vault.plugin.isolatedmodules.js
 
-import android.content.Context
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
+import it.airgap.vault.plugin.isolatedmodules.js.environment.JSEnvironment
 import it.airgap.vault.util.JSUndefined
 import it.airgap.vault.util.assign
 import it.airgap.vault.util.toJson
-import java.io.File
 import java.util.*
 
 sealed interface JSModule {
     val identifier: String
+    val namespace: String?
+    val preferredEnvironment: JSEnvironment.Type
     val paths: List<String>
 
-    data class Asset(override val identifier: String, override val paths: List<String>) : JSModule
-    data class External(override val identifier: String, override val paths: List<String>) : JSModule
+    data class Asset(
+        override val identifier: String,
+        override val namespace: String?,
+        override val preferredEnvironment: JSEnvironment.Type,
+        override val paths: List<String>,
+    ) : JSModule
+
+    data class External(
+        override val identifier: String,
+        override val namespace: String?,
+        override val preferredEnvironment: JSEnvironment.Type,
+        override val paths: List<String>,
+    ) : JSModule
 }
-
-fun JSModule.readSources(context: Context): Sequence<ByteArray> =
-    when (this) {
-        is JSModule.Asset -> readSources(context)
-        is JSModule.External -> readSources()
-    }
-
-private fun JSModule.Asset.readSources(context: Context): Sequence<ByteArray> =
-    paths.asSequence().map { path -> context.assets.open(path).use { it.readBytes() } }
-
-private fun JSModule.External.readSources(): Sequence<ByteArray> =
-    paths.asSequence().map { path -> File(path).readBytes() }
 
 enum class JSProtocolType {
     Offline, Online, Full;
