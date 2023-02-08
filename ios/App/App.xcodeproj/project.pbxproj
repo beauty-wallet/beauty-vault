@@ -41,8 +41,8 @@
 		A3C53AA1299247640059E997 /* JSEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C53AA0299247640059E997 /* JSEnvironment.swift */; };
 		A3C53AA3299259FC0059E997 /* WebViewEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C53AA2299259FC0059E997 /* WebViewEnvironment.swift */; };
 		A3C53AA52992711E0059E997 /* Sequence+Additions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C53AA42992711E0059E997 /* Sequence+Additions.swift */; };
-		A3C53AA729927B440059E997 /* Assets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C53AA629927B440059E997 /* Assets.swift */; };
-		A3C53AA92992805E0059E997 /* Files.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C53AA82992805E0059E997 /* Files.swift */; };
+		A3CE61BC2993D827009216A2 /* FileExplorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CE61BB2993D827009216A2 /* FileExplorer.swift */; };
+		A3CE61BE2993DF43009216A2 /* ModuleManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CE61BD2993DF43009216A2 /* ModuleManifest.swift */; };
 		A3CF6E4D28CA2FA100A9A883 /* IsolatedModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CF6E4C28CA2FA100A9A883 /* IsolatedModules.swift */; };
 		A3CF6E4F28CA2FD900A9A883 /* IsolatedModules.m in Sources */ = {isa = PBXBuildFile; fileRef = A3CF6E4E28CA2FD900A9A883 /* IsolatedModules.m */; };
 		A3E4DE8F299157C2009F3C8D /* JSModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E4DE8E299157C2009F3C8D /* JSModule.swift */; };
@@ -84,8 +84,8 @@
 		A3C53AA0299247640059E997 /* JSEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSEnvironment.swift; sourceTree = "<group>"; };
 		A3C53AA2299259FC0059E997 /* WebViewEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewEnvironment.swift; sourceTree = "<group>"; };
 		A3C53AA42992711E0059E997 /* Sequence+Additions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sequence+Additions.swift"; sourceTree = "<group>"; };
-		A3C53AA629927B440059E997 /* Assets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Assets.swift; sourceTree = "<group>"; };
-		A3C53AA82992805E0059E997 /* Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Files.swift; sourceTree = "<group>"; };
+		A3CE61BB2993D827009216A2 /* FileExplorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileExplorer.swift; sourceTree = "<group>"; };
+		A3CE61BD2993DF43009216A2 /* ModuleManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManifest.swift; sourceTree = "<group>"; };
 		A3CF6E4C28CA2FA100A9A883 /* IsolatedModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatedModules.swift; sourceTree = "<group>"; };
 		A3CF6E4E28CA2FD900A9A883 /* IsolatedModules.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IsolatedModules.m; sourceTree = "<group>"; };
 		A3E4DE8E299157C2009F3C8D /* JSModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSModule.swift; sourceTree = "<group>"; };
@@ -245,6 +245,8 @@
 				A3E4DE8D299157B1009F3C8D /* JS */,
 				A3CF6E4C28CA2FA100A9A883 /* IsolatedModules.swift */,
 				A3CF6E4E28CA2FD900A9A883 /* IsolatedModules.m */,
+				A3CE61BB2993D827009216A2 /* FileExplorer.swift */,
+				A3CE61BD2993DF43009216A2 /* ModuleManifest.swift */,
 			);
 			path = IsolatedModules;
 			sourceTree = "<group>";
@@ -253,10 +255,8 @@
 			isa = PBXGroup;
 			children = (
 				A3E4DE9229915E20009F3C8D /* Environment */,
-				A3C53AA629927B440059E997 /* Assets.swift */,
 				A3E4DE9029915E12009F3C8D /* JSEvaluator.swift */,
 				A3E4DE8E299157C2009F3C8D /* JSModule.swift */,
-				A3C53AA82992805E0059E997 /* Files.swift */,
 			);
 			path = JS;
 			sourceTree = "<group>";
@@ -398,7 +398,6 @@
 				A3CF6E4F28CA2FD900A9A883 /* IsolatedModules.m in Sources */,
 				A33BA9E728D9C52D00BD8015 /* JSValue+Additions.swift in Sources */,
 				A3CF6E4D28CA2FA100A9A883 /* IsolatedModules.swift in Sources */,
-				A3C53AA729927B440059E997 /* Assets.swift in Sources */,
 				A3E4DE8F299157C2009F3C8D /* JSModule.swift in Sources */,
 				885F55E825EE224200D85A88 /* SaplingNative.m in Sources */,
 				49690A7E25C2BF80004A3586 /* VaultError.swift in Sources */,
@@ -407,8 +406,8 @@
 				88F9F15623D06A76008351D0 /* CameraPreview.m in Sources */,
 				A33BA9E528D9C4EF00BD8015 /* JS.swift in Sources */,
 				88AE2EF523D5DC5100428560 /* LocalAuthentication.swift in Sources */,
+				A3CE61BE2993DF43009216A2 /* ModuleManifest.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-				A3C53AA92992805E0059E997 /* Files.swift in Sources */,
 				A3C53AA52992711E0059E997 /* Sequence+Additions.swift in Sources */,
 				88AE2EEF23D5D7B300428560 /* SecurityUtils.m in Sources */,
 				88F9F15423D06A00008351D0 /* CameraPreview.swift in Sources */,
@@ -420,6 +419,7 @@
 				88F9F14423D058DD008351D0 /* AppInfo.swift in Sources */,
 				88AE2EE823D5C7A500428560 /* SecurityUtils.swift in Sources */,
 				88F9F15223D069E9008351D0 /* CameraController.swift in Sources */,
+				A3CE61BC2993D827009216A2 /* FileExplorer.swift in Sources */,
 				88AE2EF723D5DC7400428560 /* SecureScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -11,52 +11,14 @@ import WebKit
 
 @objc(IsolatedModules)
 public class IsolatedModules: CAPPlugin {
-    private lazy var jsEvaluator: JSEvaluator = .init()
+    private let fileExplorer: FileExplorer = .shared
+    private lazy var jsEvaluator: JSEvaluator = .init(fileExplorer: fileExplorer)
     
     @objc func loadModules(_ call: CAPPluginCall) {
         Task {
             do {
                 let protocolType = call.protocolType
-                
-                // TODO: load dynamically
-                let modules: [JSModule] = [
-                    .asset(.init(
-                        identifier: "aeternity",
-                        paths: ["libs/aeternity/airgap-aeternity.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "astar",
-                        paths: ["libs/astar/airgap-astar.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "bitcoin",
-                        paths: ["libs/bitcoin/airgap-bitcoin.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "cosmos",
-                        paths: ["libs/cosmos/airgap-cosmos.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "ethereum",
-                        paths: ["libs/ethereum/airgap-ethereum.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "groestlcoin",
-                        paths: ["libs/groestlcoin/airgap-groestlcoin.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "moonbeam",
-                        paths: ["libs/moonbeam/airgap-moonbeam.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "polkadot",
-                        paths: ["libs/polkadot/airgap-polkadot.browserify.js"]
-                    )),
-                    .asset(.init(
-                        identifier: "tezos",
-                        paths: ["libs/tezos/airgap-tezos.browserify.js"]
-                    )),
-                ]
+                let modules: [JSModule] = try fileExplorer.loadAssetModules() + (try fileExplorer.loadExternalModules())
                 
                 call.resolve(try await jsEvaluator.evaluateLoadModules(modules, for: protocolType))
             } catch {

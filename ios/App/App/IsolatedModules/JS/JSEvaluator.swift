@@ -10,13 +10,18 @@ import Capacitor
 import WebKit
 
 class JSEvaluator {
-    private lazy var webViewEnv: WebViewEnvironment = .init()
-    private var modules: [String: JSModule] = [:]
+    private let webViewEnv: WebViewEnvironment
+    private let modulesManager: ModulesManager
+    
+    init(fileExplorer: FileExplorer) {
+        self.webViewEnv = .init(fileExplorer: fileExplorer)
+        self.modulesManager = .init()
+    }
     
     func evaluateLoadModules(_ modules: [JSModule], for protocolType: JSProtocolType?) async throws -> [String: Any] {
         let modulesJSON = try await modules.asyncMap { module in
             let json = try await self.webViewEnv.run(.load(.init(protocolType: protocolType)), in: module)
-            try self.registerModule(module, json: json)
+            try await self.modulesManager.registerModule(module, json: json)
             
             return json
         }
@@ -29,6 +34,7 @@ class JSEvaluator {
         ofProtocol protocolIdentifier: String,
         withArgs args: JSArray?
     ) async throws -> [String: Any] {
+        let modules = await modulesManager.modules
         guard let module = modules[protocolIdentifier] else {
             throw Error.moduleNotFound(protocolIdentifier)
         }
@@ -49,6 +55,7 @@ class JSEvaluator {
         onNetwork networkID: String?,
         withArgs args: JSArray?
     ) async throws -> [String: Any] {
+        let modules = await modulesManager.modules
         guard let module = modules[protocolIdentifier] else {
             throw Error.moduleNotFound(protocolIdentifier)
         }
@@ -69,6 +76,7 @@ class JSEvaluator {
         onNetwork networkID: String?,
         withArgs args: JSArray?
     ) async throws -> [String: Any] {
+        let modules = await modulesManager.modules
         guard let module = modules[protocolIdentifier] else {
             throw Error.moduleNotFound(protocolIdentifier)
         }
@@ -88,6 +96,7 @@ class JSEvaluator {
         ofModule moduleIdentifier: String,
         withArgs args: JSArray?
     ) async throws -> [String: Any] {
+        let modules = await modulesManager.modules
         guard let module = modules[moduleIdentifier] else {
             throw Error.moduleNotFound(moduleIdentifier)
         }
@@ -106,19 +115,23 @@ class JSEvaluator {
         try await webViewEnv.destroy()
     }
     
-    private func registerModule(_ module: JSModule, json: [String: Any]) throws {
-        modules[module.identifier] = module
+    private actor ModulesManager {
+        private(set) var modules: [String: JSModule] = [:]
         
-        guard let protocols = json["protocols"] as? [Any] else {
-            throw Error.invalidJSON
-        }
-        
-        try protocols.forEach { `protocol` in
-            guard let `protocol` = `protocol` as? [String: Any], let identifier = `protocol`["identifier"] as? String else {
+        func registerModule(_ module: JSModule, json: [String: Any]) throws {
+            modules[module.identifier] = module
+            
+            guard let protocols = json["protocols"] as? [Any] else {
                 throw Error.invalidJSON
             }
             
-            modules[identifier] = module
+            try protocols.forEach { `protocol` in
+                guard let `protocol` = `protocol` as? [String: Any], let identifier = `protocol`["identifier"] as? String else {
+                    throw Error.invalidJSON
+                }
+                
+                modules[identifier] = module
+            }
         }
     }
     

@@ -9,6 +9,11 @@ import Foundation
 import WebKit
 
 class WebViewEnvironment: NSObject, JSEnvironment, WKNavigationDelegate {
+    private let fileExplorer: FileExplorer
+    
+    init(fileExplorer: FileExplorer) {
+        self.fileExplorer = fileExplorer
+    }
     
     @MainActor
     func run(_ action: JSModuleAction, in module: JSModule) async throws -> [String: Any] {
@@ -32,22 +37,18 @@ class WebViewEnvironment: NSObject, JSEnvironment, WKNavigationDelegate {
                 webView.removeFromSuperview()
             }
             
-            try await webView.evaluateJavaScriptAsync(try Assets.readScript())
-            for source in try module.readSources() {
+            try await webView.evaluateJavaScriptAsync(try fileExplorer.readIsolatedModulesScript())
+            for source in try fileExplorer.readModuleSources(module) {
                 try await webView.evaluateJavaScriptAsync(source)
             }
             
             let script = """
-                \(module.identifier).create = () => {
-                    return new \(module.identifier).\(module.identifier.capitalized)Module
-                }
-            
                 function postMessage(message) {
                     window.webkit.messageHandlers.\(jsAsyncResult.id).postMessage(message);
                 };
             
                 execute(
-                    \(module.identifier),
+                    \(try module.namespace ?? (try JSUndefined.value.toJSONString())),
                     '\(module.identifier)',
                     \(try action.toJSONString()),
                     function (result) {

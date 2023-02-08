@@ -10,7 +10,7 @@ import Capacitor
 
 // MARK: JSModule
 
-enum JSModule: JSModuleProtocol {
+enum JSModule {
     case asset(Asset)
     case external(External)
     
@@ -23,6 +23,24 @@ enum JSModule: JSModuleProtocol {
         }
     }
     
+    var namespace: String? {
+        switch self {
+        case .asset(let asset):
+            return asset.namespace
+        case .external(let external):
+            return external.namespace
+        }
+    }
+    
+    var preferredEnvironment: JSEnvironmentKind {
+        switch self {
+        case .asset(let asset):
+            return asset.preferredEnvironment
+        case .external(let external):
+            return external.preferredEnvironment
+        }
+    }
+    
     var paths: [String] {
         switch self {
         case .asset(let asset):
@@ -32,39 +50,28 @@ enum JSModule: JSModuleProtocol {
         }
     }
     
-    func readSources() throws -> [String] {
-        switch self {
-        case .asset(let asset):
-            return try asset.readSources()
-        case .external(let external):
-            return try external.readSources()
-        }
-    }
-    
     struct Asset: JSModuleProtocol {
         let identifier: String
+        let namespace: String?
+        let preferredEnvironment: JSEnvironmentKind
         let paths: [String]
-        
-        func readSources() throws -> [String] {
-            try paths.lazy.map { try Assets.readString(at: $0) }
-        }
     }
     
     struct External: JSModuleProtocol {
         let identifier: String
+        let namespace: String?
+        let preferredEnvironment: JSEnvironmentKind
         let paths: [String]
-        
-        func readSources() throws -> [String] {
-            try paths.lazy.map { try Files.readString(at: $0) }
-        }
     }
 }
 
 protocol JSModuleProtocol {
     var identifier: String { get }
+    var namespace: String? { get }
+    var preferredEnvironment: JSEnvironmentKind { get }
     var paths: [String] { get }
     
-    func readSources() throws -> [String]
+    init(identifier: String, namespace: String?, preferredEnvironment: JSEnvironmentKind, paths: [String])
 }
 
 // MARK: JSProtocolType

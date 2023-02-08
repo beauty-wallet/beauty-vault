@@ -11,3 +11,7 @@ protocol JSEnvironment {
     func run(_ action: JSModuleAction, in module: JSModule) async throws -> [String: Any]
     func destroy() async throws
 }
+
+enum JSEnvironmentKind: String, Codable {
+    case webview
+}

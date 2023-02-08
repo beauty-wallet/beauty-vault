@@ -261,7 +261,7 @@ export class ProtocolModuleService {
   }
 
   public async installModule(metadata: ProtocolModuleMetadata) {
-    const newPath: string = `protocol_modules/${metadata.manifest.name.replace(/\s+/, '_').replace('/', '').toLocaleLowerCase()}`
+    const newPath: string = `protocol_modules/${metadata.manifest.name.replace(/\s+/, '_').replace(/[^a-zA-Z\d_-]/g, '').toLocaleLowerCase()}`
     const newDirectory: Directory = Directory.Data
 
     try {
