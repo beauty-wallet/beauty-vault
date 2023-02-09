@@ -12,20 +12,28 @@ sealed interface JSModule {
     val identifier: String
     val namespace: String?
     val preferredEnvironment: JSEnvironment.Type
-    val paths: List<String>
+    val sources: List<String>
 
     data class Asset(
         override val identifier: String,
         override val namespace: String?,
         override val preferredEnvironment: JSEnvironment.Type,
-        override val paths: List<String>,
+        override val sources: List<String>,
     ) : JSModule
 
-    data class External(
+    data class Installed(
         override val identifier: String,
         override val namespace: String?,
         override val preferredEnvironment: JSEnvironment.Type,
-        override val paths: List<String>,
+        override val sources: List<String>,
+    ) : JSModule
+
+    data class Preview(
+        override val identifier: String,
+        override val namespace: String?,
+        override val preferredEnvironment: JSEnvironment.Type,
+        override val sources: List<String>,
+        val path: String,
     ) : JSModule
 }
 

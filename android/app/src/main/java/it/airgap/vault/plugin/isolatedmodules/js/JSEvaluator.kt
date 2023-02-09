@@ -18,9 +18,21 @@ class JSEvaluator constructor(
 ) {
     private val modules: MutableMap<String, JSModule> = mutableMapOf()
 
+    fun registerModule(module: JSModule, protocolIdentifiers: List<String>) {
+        module.registerFor(protocolIdentifiers)
+    }
+
+    suspend fun evaluatePreviewModule(module: JSModule): JSObject =
+        module.environment.run(module, JSModuleAction.Load(null)).also {
+            module.appendType(it)
+        }
+
     suspend fun evaluateLoadModules(modules: List<JSModule>, protocolType: JSProtocolType?): JSObject {
         val modulesJson = modules.asyncMap { module ->
-            module.environment.run(module, JSModuleAction.Load(protocolType)).also { module.registerFor(it) }
+            module.environment.run(module, JSModuleAction.Load(protocolType)).also {
+                module.appendType(it)
+                module.registerFor(it)
+            }
         }
 
         return JSObject("""
@@ -76,16 +88,30 @@ class JSEvaluator constructor(
     private val JSModule.environment: JSEnvironment
         get() = environments[preferredEnvironment] ?: defaultEnvironment
 
-    private fun JSModule.registerFor(json: JSObject) {
-        modules[identifier] = this
-
-        val protocols = json.getJSONArray("protocols")
-        for (i in 0 until protocols.length()) {
-            val protocol = protocols.getJSONObject(i)
-            val identifier = protocol.getString("identifier")
-
-            modules[identifier] = this
+    private fun JSModule.appendType(json: JSObject) {
+        val type = when (this) {
+            is JSModule.Asset -> "static"
+            is JSModule.Installed, is JSModule.Preview -> "dynamic"
         }
+
+        json.put("type", type)
+    }
+
+    private fun JSModule.registerFor(json: JSObject) {
+        val protocols = json.getJSONArray("protocols")
+        val protocolIdentifiers = buildList {
+            for (i in 0 until protocols.length()) {
+                val protocol = protocols.getJSONObject(i)
+                add(protocol.getString("identifier"))
+            }
+        }
+
+        registerFor(protocolIdentifiers)
+    }
+
+    private fun JSModule.registerFor(protocolIdentifiers: List<String>) {
+        modules[identifier] = this
+        protocolIdentifiers.forEach { modules[it] = this }
     }
 
     @Throws(IllegalStateException::class)

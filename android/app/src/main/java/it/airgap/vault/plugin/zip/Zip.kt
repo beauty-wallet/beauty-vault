@@ -7,8 +7,10 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import it.airgap.vault.util.Directory
 import it.airgap.vault.util.assertReceived
 import it.airgap.vault.util.executeCatching
+import it.airgap.vault.util.getDirectory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,7 +42,7 @@ class Zip : Plugin() {
     }
 
     @Throws(IOException::class)
-    private suspend fun unzip(from: String, directory: String?, to: String, toDirectory: String?) {
+    private suspend fun unzip(from: String, directory: Directory?, to: String, toDirectory: Directory?) {
         val fromStream = getInputStream(from, directory) ?: throw IOException("Failed to create `to` InputStream")
         val outFile = getFile(to, toDirectory)
 
@@ -80,17 +82,17 @@ class Zip : Plugin() {
     }
 
     @Throws(IOException::class)
-    private fun getInputStream(path: String, directory: String?): InputStream? =
+    private fun getInputStream(path: String, directory: Directory?): InputStream? =
         processFilePath(path, directory, ::FileInputStream, context.contentResolver::openInputStream)
 
     @Throws(IOException::class)
-    private fun getFile(path: String, directory: String?): File =
+    private fun getFile(path: String, directory: Directory?): File =
         processFilePath(path, directory, { it })
 
     @Throws(IOException::class)
     private fun <T> processFilePath(
         path: String,
-        directory: String?,
+        directory: Directory?,
         processFile: (File) -> T,
         processContent: ((Uri) -> T)? = null,
     ): T {
@@ -103,20 +105,10 @@ class Zip : Plugin() {
             }
         }
 
-        val androidDirectory = getDirectory(directory) ?: throw IOException("Directory not found")
+        val androidDirectory = context.getDirectory(directory) ?: throw IOException("Directory not found")
 
         return processFile(File(androidDirectory, path))
     }
-
-    private fun getDirectory(directory: String?): File? =
-        when (directory) {
-            Directory.DOCUMENTS -> Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            Directory.DATA, Directory.LIBRARY -> context.filesDir
-            Directory.CACHE -> context.cacheDir
-            Directory.EXTERNAL -> context.getExternalFilesDir(null)
-            Directory.EXTERNAL_STORAGE -> Environment.getExternalStorageDirectory()
-            else -> null
-        }
 
     private val PluginCall.from: String
         get() = getString(Param.FROM)!!
@@ -124,26 +116,17 @@ class Zip : Plugin() {
     private val PluginCall.to: String
         get() = getString(Param.TO)!!
 
-    private val PluginCall.directory: String?
-        get() = getString(Param.DIRECTORY)
+    private val PluginCall.directory: Directory?
+        get() = getString(Param.DIRECTORY)?.let { Directory.fromString(it) }
 
-    private val PluginCall.toDirectory: String?
-        get() = getString(Param.TO_DIRECTORY)
+    private val PluginCall.toDirectory: Directory?
+        get() = getString(Param.TO_DIRECTORY)?.let { Directory.fromString(it) }
 
     private object Param {
         const val FROM = "from"
         const val TO = "to"
         const val DIRECTORY = "directory"
         const val TO_DIRECTORY = "toDirectory"
-    }
-
-    private object Directory {
-        const val DOCUMENTS = "DOCUMENTS"
-        const val DATA = "DATA"
-        const val LIBRARY = "LIBRARY"
-        const val CACHE = "CACHE"
-        const val EXTERNAL = "EXTERNAL"
-        const val EXTERNAL_STORAGE = "EXTERNAL_STORAGE"
     }
 
     private companion object {

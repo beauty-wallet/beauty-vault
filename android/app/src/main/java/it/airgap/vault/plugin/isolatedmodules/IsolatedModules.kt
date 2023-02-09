@@ -8,11 +8,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import it.airgap.vault.plugin.isolatedmodules.js.*
-import it.airgap.vault.plugin.isolatedmodules.js.environment.JSEnvironment
-import it.airgap.vault.util.ExecutableDeferred
-import it.airgap.vault.util.assertReceived
-import it.airgap.vault.util.executeCatching
-import it.airgap.vault.util.readBytes
+import it.airgap.vault.util.*
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.launch
 
@@ -20,6 +16,48 @@ import kotlinx.coroutines.launch
 class IsolatedModules : Plugin() {
     private val jsEvaluator: Deferred<JSEvaluator> = ExecutableDeferred { JSEvaluator(context, fileExplorer) }
     private val fileExplorer: FileExplorer by lazy { FileExplorer(context) }
+
+    @PluginMethod
+    fun previewModule(call: PluginCall) {
+        call.executeCatching {
+            assertReceived(Param.PATH, Param.DIRECTORY)
+
+            activity.lifecycleScope.launch {
+                executeCatching {
+                    val module = fileExplorer.loadPreviewModule(path, directory)
+                    val manifest = fileExplorer.readModuleManifest(module)
+                    val moduleJson = jsEvaluator.await().evaluatePreviewModule(module)
+
+                    resolve(
+                        JSObject(
+                            """
+                        {
+                            "module": $moduleJson,
+                            "manifest": ${JSObject(manifest.decodeToString())}
+                        }
+                    """.trimIndent()
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    @PluginMethod
+    fun registerModule(call: PluginCall) {
+        call.executeCatching {
+            assertReceived(Param.IDENTIFIER, Param.PROTOCOL_IDENTIFIERS)
+
+            activity.lifecycleScope.launch {
+                executeCatching {
+                    val module = fileExplorer.loadInstalledModule(identifier)
+                    jsEvaluator.await().registerModule(module, protocolIdentifiers)
+
+                    resolve()
+                }
+            }
+        }
+    }
 
     @PluginMethod
     fun loadModules(call: PluginCall) {
@@ -70,6 +108,18 @@ class IsolatedModules : Plugin() {
         }
     }
 
+    private val PluginCall.path: String
+        get() = getString(Param.PATH)!!
+
+    private val PluginCall.directory: Directory
+        get() = getString(Param.DIRECTORY)?.let { Directory.fromString(it) }!!
+
+    private val PluginCall.identifier: String
+        get() = getString(Param.IDENTIFIER)!!
+
+    private  val PluginCall.protocolIdentifiers: List<String>
+        get() = getArray(Param.PROTOCOL_IDENTIFIERS).toList()
+
     private val PluginCall.protocolType: JSProtocolType?
         get() = getString(Param.PROTOCOL_TYPE)?.let { JSProtocolType.fromString(it) }
 
@@ -92,6 +142,10 @@ class IsolatedModules : Plugin() {
         get() = getString(Param.NETWORK_ID)
 
     private object Param {
+        const val PATH = "path"
+        const val DIRECTORY = "directory"
+        const val IDENTIFIER = "identifier"
+        const val PROTOCOL_IDENTIFIERS = "protocolIdentifiers"
         const val PROTOCOL_TYPE = "protocolType"
         const val TARGET = "target"
         const val METHOD = "method"
