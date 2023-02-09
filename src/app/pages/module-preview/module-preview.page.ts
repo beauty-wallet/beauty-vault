@@ -1,9 +1,8 @@
-import { UIResource, UIResourceStatus } from '@airgap/angular-core'
+import { isIsolatedModuleMetadata, IsolatedModuleMetadata, UIResource, UIResourceStatus } from '@airgap/angular-core'
 import { Component, OnInit } from '@angular/core'
 import { Store } from '@ngrx/store'
 import { Observable } from 'rxjs'
 import { NavigationService } from 'src/app/services/navigation/navigation.service'
-import { isProtocolModuleMetadata, ProtocolModuleMetadata } from 'src/app/services/protocol-module/protocol-module.service'
 
 import * as actions from './module-preview.actions'
 import * as fromModulePreview from './module-preview.reducer'
@@ -16,7 +15,7 @@ import * as fromModulePreview from './module-preview.reducer'
 export class ModulePreviewPage implements OnInit {
   public readonly moduleName: string | undefined
 
-  public readonly moduleMetadata$: Observable<UIResource<ProtocolModuleMetadata>>
+  public readonly moduleMetadata$: Observable<UIResource<IsolatedModuleMetadata>>
 
   public readonly UIResourceStatus: typeof UIResourceStatus = UIResourceStatus
 
@@ -25,7 +24,7 @@ export class ModulePreviewPage implements OnInit {
     private readonly navigationService: NavigationService
   ) {
     const state = this.navigationService.getState()
-    if (state.metadata && isProtocolModuleMetadata(state.metadata)) {
+    if (state.metadata && isIsolatedModuleMetadata(state.metadata)) {
       this.moduleName = state.metadata.manifest.name
     }
 
@@ -36,7 +35,7 @@ export class ModulePreviewPage implements OnInit {
     this.store.dispatch(actions.viewInitialization())
   }
 
-  public install(metadata: ProtocolModuleMetadata) {
+  public install(metadata: IsolatedModuleMetadata) {
     this.store.dispatch(actions.installModule({ metadata }))
   }
 }

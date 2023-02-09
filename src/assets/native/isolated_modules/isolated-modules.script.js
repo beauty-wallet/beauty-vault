@@ -99,7 +99,7 @@ function getIsolatedProtocolConfiguration(protocol, mode, blockExplorerMetadata,
     })
 }
 
-function loadOfflineProtocols(module, protocolIdentifier) {
+function loadOfflineProtocolMetadata(module, protocolIdentifier) {
   return module.createOfflineProtocol(protocolIdentifier)
     .then((protocol) => {
       if (protocol === undefined) {
@@ -110,7 +110,7 @@ function loadOfflineProtocols(module, protocolIdentifier) {
     })
 }
 
-function loadOnlineProtocols(module, protocolIdentifier, configuration) {
+function loadOnlineProtocolMetadata(module, protocolIdentifier, configuration) {
   return Promise.all(
     Object.entries(configuration.networks).map(([networkId, _]) => {
       return Promise.all([
@@ -130,7 +130,7 @@ function loadOnlineProtocols(module, protocolIdentifier, configuration) {
   ).then((isolatedProtocols) => isolatedProtocols.filter((protocol) => protocol !== undefined))
 }
 
-function loadProtocolsFromConfiguration(module, protocolIdentifier, configuration, protocolType) {
+function loadProtocolMetadataFromConfiguration(module, protocolIdentifier, configuration, protocolType) {
   const offlineConfiguration = 
     protocolType === PROTOCOL_TYPE_OFFLINE || protocolType === PROTOCOL_TYPE_FULL || protocolType === undefined
       ? configuration.type === PROTOCOL_TYPE_OFFLINE
@@ -150,14 +150,14 @@ function loadProtocolsFromConfiguration(module, protocolIdentifier, configuratio
       : undefined
 
   return Promise.all([
-    offlineConfiguration ? loadOfflineProtocols(module, protocolIdentifier) : Promise.resolve([]),
-    onlineConfiguration ? loadOnlineProtocols(module, protocolIdentifier, onlineConfiguration) : Promise.resolve([])
+    offlineConfiguration ? loadOfflineProtocolMetadata(module, protocolIdentifier) : Promise.resolve([]),
+    onlineConfiguration ? loadOnlineProtocolMetadata(module, protocolIdentifier, onlineConfiguration) : Promise.resolve([])
   ]).then(([offline, online]) => offline.concat(online))
 }
 
 function loadProtocols(module, protocolType) {
   return Promise.all(
-    Object.entries(module.supportedProtocols).map(([protocolIdentifier, configuration]) => loadProtocolsFromConfiguration(module, protocolIdentifier, configuration, protocolType))
+    Object.entries(module.supportedProtocols).map(([protocolIdentifier, configuration]) => loadProtocolMetadataFromConfiguration(module, protocolIdentifier, configuration, protocolType))
   ).then((protocols) => flattened(protocols))
 }
 

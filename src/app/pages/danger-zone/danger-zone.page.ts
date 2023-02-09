@@ -1,4 +1,4 @@
-import { UiEventService } from '@airgap/angular-core'
+import { IsolatedModuleMetadata, IsolatedModulesService, UiEventService } from '@airgap/angular-core'
 import { Component, Inject, OnInit } from '@angular/core'
 import { FilePickerPlugin, PickFilesResult } from '@capawesome/capacitor-file-picker'
 import { AlertController } from '@ionic/angular'
@@ -6,7 +6,6 @@ import { TranslateService } from '@ngx-translate/core'
 import { FILE_PICKER_PLUGIN } from 'src/app/capacitor-plugins/injection-tokens'
 import { ErrorCategory, handleErrorLocal } from 'src/app/services/error-handler/error-handler.service'
 import { NavigationService } from 'src/app/services/navigation/navigation.service'
-import { ProtocolModuleMetadata, ProtocolModuleService } from 'src/app/services/protocol-module/protocol-module.service'
 import { SecureStorageService } from 'src/app/services/secure-storage/secure-storage.service'
 import { VaultStorageService } from 'src/app/services/storage/storage.service'
 
@@ -22,7 +21,7 @@ export class DangerZonePage implements OnInit {
     public readonly storageService: VaultStorageService,
     private readonly secureStorage: SecureStorageService,
     private readonly navigationService: NavigationService,
-    private readonly protocolModuleService: ProtocolModuleService,
+    private readonly isolatedModuleService: IsolatedModulesService,
     private readonly uiEventService: UiEventService,
     @Inject(FILE_PICKER_PLUGIN) private readonly filePicker: FilePickerPlugin
   ) {}
@@ -81,15 +80,15 @@ export class DangerZonePage implements OnInit {
         readData: false
       })
       const { name, path } = files[0]
-      // if (!path) {
-      //   throw new Error(`Can't open the file.`)
-      // }
+      if (!path) {
+        throw new Error(`Can't open the file.`)
+      }
 
       loader = await this.uiEventService.getTranslatedLoader({
         message: 'Loading...'
       })
       await loader.present().catch(handleErrorLocal(ErrorCategory.IONIC_LOADER))
-      const metadata: ProtocolModuleMetadata = await this.protocolModuleService.readModuleMetadata(name, path)
+      const metadata: IsolatedModuleMetadata = await this.isolatedModuleService.readModuleMetadata(name, path)
 
       this.navigationService.routeWithState('/module-preview', { metadata }).catch(handleErrorLocal(ErrorCategory.IONIC_NAVIGATION))
     } catch (e) {

@@ -1,7 +1,6 @@
-import { UIResource, UIResourceStatus } from '@airgap/angular-core'
+import { IsolatedModuleMetadata, UIResource, UIResourceStatus } from '@airgap/angular-core'
 import { createFeatureSelector, createReducer, createSelector, on } from '@ngrx/store'
 
-import { ProtocolModuleMetadata } from '../../../app/services/protocol-module/protocol-module.service'
 import * as fromRoot from '../../app.reducers'
 
 import * as actions from './module-preview.actions'
@@ -9,7 +8,7 @@ import * as actions from './module-preview.actions'
 /**************** State ****************/
 
 export interface FeatureState {
-  moduleMetadata: UIResource<ProtocolModuleMetadata>
+  moduleMetadata: UIResource<IsolatedModuleMetadata>
 }
 
 export interface State extends fromRoot.State {

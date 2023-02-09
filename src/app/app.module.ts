@@ -17,7 +17,9 @@ import {
   FILESYSTEM_PLUGIN,
   UiEventService,
   IsolatedModules,
-  ISOLATED_MODULES_PLUGIN
+  ISOLATED_MODULES_PLUGIN,
+  Zip,
+  ZIP_PLUGIN
 } from '@airgap/angular-core'
 import { AirGapAngularNgRxModule, currencySymbolNgRxFacade } from '@airgap/angular-ngrx'
 import { PercentPipe } from '@angular/common'
@@ -42,8 +44,8 @@ import { TranslateLoader, TranslateModule } from '@ngx-translate/core'
 import { AppRoutingModule } from './app-routing.module'
 import { AppComponent } from './app.component'
 import * as fromRoot from './app.reducers'
-import { CameraPreview, SaplingNative, SecurityUtils, Zip } from './capacitor-plugins/definitions'
-import { CAMERA_PREVIEW_PLUGIN, FILE_PICKER_PLUGIN, SAPLING_PLUGIN, SECURITY_UTILS_PLUGIN, ZIP_PLUGIN } from './capacitor-plugins/injection-tokens'
+import { CameraPreview, SaplingNative, SecurityUtils } from './capacitor-plugins/definitions'
+import { CAMERA_PREVIEW_PLUGIN, FILE_PICKER_PLUGIN, SAPLING_PLUGIN, SECURITY_UTILS_PLUGIN } from './capacitor-plugins/injection-tokens'
 import { appConfig } from './config/app-config'
 import { DistributionOnboardingPageModule } from './pages/distribution-onboarding/distribution-onboarding.module'
 import { IntroductionPageModule } from './pages/introduction/introduction.module'

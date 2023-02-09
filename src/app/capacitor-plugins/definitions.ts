@@ -1,5 +1,4 @@
 import { PluginListenerHandle, registerPlugin } from '@capacitor/core'
-import { Directory } from '@capacitor/filesystem'
 
 export interface CameraPreviewPlugin {
   start({}): Promise<void>
@@ -59,14 +58,3 @@ export interface SecurityUtilsPlugin {
 }
 
 export const SecurityUtils: SecurityUtilsPlugin = registerPlugin('SecurityUtils')
-
-export interface ZipPlugin {
-  unzip(params: {
-    from: string
-    to: string
-    directory?: Directory
-    toDirectory?: Directory
-  }): Promise<void>
-}
-
-export const Zip: ZipPlugin = registerPlugin('Zip')

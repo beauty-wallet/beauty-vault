@@ -1,6 +1,6 @@
 
+import { IsolatedModuleMetadata } from '@airgap/angular-core'
 import { createAction, props } from '@ngrx/store'
-import { ProtocolModuleMetadata } from 'src/app/services/protocol-module/protocol-module.service'
 
 const featureName = 'Module Preview'
 
@@ -13,13 +13,13 @@ export const viewInitialization = createAction(`[${featureName}] View Initializa
 export const navigationDataLoading = createAction(`[${featureName}] Navigation Data Loading`)
 export const navigationDataLoaded = createAction(
   `[${featureName}] Navigation Data Loaded`,
-  props<{ metadata: ProtocolModuleMetadata }>()
+  props<{ metadata: IsolatedModuleMetadata }>()
 )
 export const invalidData = createAction(`[${featureName}] Invalid Navigation Data`)
 
 /**************** User Interaction ****************/
 
-export const installModule = createAction(`[${featureName}] Install Module`, props<{ metadata: ProtocolModuleMetadata }>())
+export const installModule = createAction(`[${featureName}] Install Module`, props<{ metadata: IsolatedModuleMetadata }>())
 export const moduleInstalling = createAction(`[${featureName}] Module Installing`)
 export const moduleInstalled = createAction(`[${featureName}] Module Installed`)
 export const moduleFailedToInstall = createAction(`[${featureName}] Module Failed to Install`)
